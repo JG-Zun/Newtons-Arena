@@ -1,32 +1,60 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 function App() {
   const canvasRef = useRef(null)
-  
-  // We store our array of objects in a ref so updating them doesn't lag the game
   const objectsRef = useRef([])
+  
+  // Track our score in React state so the UI updates
+  const [spawnCount, setSpawnCount] = useState(0)
+  const [saveStatus, setSaveStatus] = useState('')
 
-  // This function fires every time you click the canvas
   const handleCanvasClick = (event) => {
     const canvas = canvasRef.current
     const rect = canvas.getBoundingClientRect()
-    
-    // Calculate exact mouse coordinates inside the canvas
     const clickX = event.clientX - rect.left
     const clickY = event.clientY - rect.top
 
-    // Add a brand new physics object to our array
     objectsRef.current.push({
       x: clickX,
       y: clickY,
-      radius: Math.random() * 15 + 10, // Random size between 10 and 25
+      radius: Math.random() * 15 + 10,
       velocityY: 0,
-      velocityX: (Math.random() - 0.5) * 6, // Random horizontal speed
-      color: `hsl(${Math.random() * 360}, 80%, 60%)`, // Random neon color
+      velocityX: (Math.random() - 0.5) * 6,
+      color: `hsl(${Math.random() * 360}, 80%, 60%)`,
       gravity: 0.5,
       bounce: -0.7
     })
+    
+    // Update the score every time we spawn an object
+    setSpawnCount(objectsRef.current.length)
+  }
+
+  // The Full-Stack Connection: Sending data to Node/MongoDB
+  const saveScoreToDatabase = async () => {
+    setSaveStatus('Saving to MongoDB...')
+    try {
+      const response = await fetch('http://localhost:5001/api/scores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerName: 'Guest Player',
+          objectsSpawned: spawnCount
+        })
+      })
+
+      if (response.ok) {
+        setSaveStatus('Score Saved Successfully! 🚀')
+        setTimeout(() => setSaveStatus(''), 3000) // Clear message after 3 seconds
+      } else {
+        setSaveStatus('Failed to save.')
+      }
+    } catch (error) {
+      console.error(error)
+      setSaveStatus('Server error. Is the backend running?')
+    }
   }
 
   useEffect(() => {
@@ -35,28 +63,22 @@ function App() {
     let animationFrameId
     
     const render = () => {
-      // 1. Clear the arena for the new frame
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       
-      // 2. Loop through every object in our array and apply physics
       objectsRef.current.forEach(obj => {
-        // Gravity & Movement
         obj.velocityY += obj.gravity
         obj.y += obj.velocityY
         obj.x += obj.velocityX
 
-        // Floor Collision
         if (obj.y + obj.radius > canvas.height) {
           obj.y = canvas.height - obj.radius
           obj.velocityY *= obj.bounce
         }
         
-        // Wall Collision (Bounce off the sides)
         if (obj.x + obj.radius > canvas.width || obj.x - obj.radius < 0) {
           obj.velocityX *= -1 
         }
 
-        // 3. Draw the object
         ctx.beginPath()
         ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI)
         ctx.fillStyle = obj.color
@@ -73,7 +95,19 @@ function App() {
   return (
     <div className="arena-container">
       <h1>Newton's Arena</h1>
-      <p>Click anywhere inside the box to spawn objects!</p>
+      
+      {/* Scoreboard and Full-Stack Controls */}
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <p style={{ fontSize: '1.2rem', margin: 0 }}>Objects Spawned: <strong>{spawnCount}</strong></p>
+        <button 
+          onClick={saveScoreToDatabase}
+          style={{ padding: '10px 20px', fontSize: '1rem', cursor: 'pointer', borderRadius: '8px', border: 'none', background: '#646cff', color: 'white' }}
+        >
+          Save Score
+        </button>
+        <span style={{ color: '#4ade80', fontWeight: 'bold' }}>{saveStatus}</span>
+      </div>
+
       <canvas 
         ref={canvasRef} 
         width={800} 
