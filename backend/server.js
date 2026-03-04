@@ -40,7 +40,7 @@ app.post('/api/scores', async (req, res) => {
 // 3. API Route: Get top 5 scores (GET request)
 app.get('/api/scores', async (req, res) => {
   try {
-    const topScores = await Score.find().sort({ objectsSpawned: -1 }).limit(5);
+    const topScores = await Score.find().sort({ objectsSpawned: -1 }).limit(10);
     res.json(topScores);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch scores' });

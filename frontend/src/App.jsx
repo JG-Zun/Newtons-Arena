@@ -5,10 +5,31 @@ function App() {
   const canvasRef = useRef(null)
   const objectsRef = useRef([])
   
-  // Track our score in React state so the UI updates
+  // New State Variables for the Leaderboard and Username
   const [spawnCount, setSpawnCount] = useState(0)
   const [saveStatus, setSaveStatus] = useState('')
+  const [username, setUsername] = useState('')
+  const [leaderboard, setLeaderboard] = useState([])
 
+  // 1. Fetch the Top 5 Scores from MongoDB
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/scores')
+      if (response.ok) {
+        const data = await response.json()
+        setLeaderboard(data)
+      }
+    } catch (error) {
+      console.error('Could not fetch leaderboard:', error)
+    }
+  }
+
+  // Load the leaderboard as soon as the website opens
+  useEffect(() => {
+    fetchLeaderboard()
+  }, [])
+
+  // 2. Handle the physics engine spawning
   const handleCanvasClick = (event) => {
     const canvas = canvasRef.current
     const rect = canvas.getBoundingClientRect()
@@ -26,12 +47,17 @@ function App() {
       bounce: -0.7
     })
     
-    // Update the score every time we spawn an object
     setSpawnCount(objectsRef.current.length)
   }
 
-  // The Full-Stack Connection: Sending data to Node/MongoDB
+  // 3. Save the score with the custom username
   const saveScoreToDatabase = async () => {
+    // Prevent saving if they haven't typed a name
+    if (username.trim() === '') {
+      setSaveStatus('⚠️ Please enter a username first!')
+      return
+    }
+
     setSaveStatus('Saving to MongoDB...')
     try {
       const response = await fetch('http://localhost:5001/api/scores', {
@@ -40,14 +66,15 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          playerName: 'Guest Player',
+          playerName: username,
           objectsSpawned: spawnCount
         })
       })
 
       if (response.ok) {
         setSaveStatus('Score Saved Successfully! 🚀')
-        setTimeout(() => setSaveStatus(''), 3000) // Clear message after 3 seconds
+        fetchLeaderboard() // Instantly refresh the leaderboard!
+        setTimeout(() => setSaveStatus(''), 3000)
       } else {
         setSaveStatus('Failed to save.')
       }
@@ -57,6 +84,7 @@ function App() {
     }
   }
 
+  // 4. The Physics Render Loop
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
@@ -93,12 +121,21 @@ function App() {
   }, [])
 
   return (
-    <div className="arena-container">
+    <div className="arena-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px' }}>
       <h1>Newton's Arena</h1>
       
-      {/* Scoreboard and Full-Stack Controls */}
-      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+      {/* Controls: Username, Score, and Save Button */}
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'center' }}>
         <p style={{ fontSize: '1.2rem', margin: 0 }}>Objects Spawned: <strong>{spawnCount}</strong></p>
+        
+        <input 
+          type="text" 
+          placeholder="Enter username..." 
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          style={{ padding: '10px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #646cff', background: '#1a1a1a', color: 'white' }}
+        />
+
         <button 
           onClick={saveScoreToDatabase}
           style={{ padding: '10px 20px', fontSize: '1rem', cursor: 'pointer', borderRadius: '8px', border: 'none', background: '#646cff', color: 'white' }}
@@ -108,13 +145,36 @@ function App() {
         <span style={{ color: '#4ade80', fontWeight: 'bold' }}>{saveStatus}</span>
       </div>
 
-      <canvas 
-        ref={canvasRef} 
-        width={800} 
-        height={600} 
-        onClick={handleCanvasClick}
-        style={{ border: '2px solid #646cff', background: '#1a1a1a', borderRadius: '8px', cursor: 'crosshair' }}
-      />
+      {/* Game and Leaderboard Layout */}
+      <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        
+        {/* The Physics Canvas */}
+        <canvas 
+          ref={canvasRef} 
+          width={800} 
+          height={600} 
+          onClick={handleCanvasClick}
+          style={{ border: '2px solid #646cff', background: '#1a1a1a', borderRadius: '8px', cursor: 'crosshair' }}
+        />
+
+        {/* The Global Leaderboard */}
+        <div style={{ background: '#1a1a1a', padding: '20px', borderRadius: '8px', border: '2px solid #646cff', minWidth: '250px' }}>
+          <h2>🏆 Top 10 Arena Masters</h2>
+          {leaderboard.length === 0 ? (
+            <p>No scores yet. Be the first!</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, fontSize: '1.1rem' }}>
+              {leaderboard.map((score, index) => (
+                <li key={index} style={{ padding: '10px 0', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between' }}>
+                  <span><strong>#{index + 1}</strong> {score.playerName}</span>
+                  <span style={{ color: '#646cff', fontWeight: 'bold' }}>{score.objectsSpawned}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        
+      </div>
     </div>
   )
 }
