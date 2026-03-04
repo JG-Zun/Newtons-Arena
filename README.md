@@ -21,7 +21,7 @@ To run this project on your local machine, you will need Node.js and a MongoDB c
 
 ### 1. Clone the repository
 \`\`\`bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/newtons-arena.git
+git clone https://github.com/JG-Zun/newtons-arena.git
 cd newtons-arena
 \`\`\`
 
